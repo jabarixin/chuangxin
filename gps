@@ -1,0 +1,74 @@
+import math
+import time
+import traceback
+import thread
+import os
+import commands
+import RPi.GPIO as GPIO
+import serial
+import string
+
+
+def get_four_gene_state():
+  four_gene_state=0
+  print os.path.exists('/dev/ttyUSB0')
+  if os.path.exists('/dev/ttyUSB0')!=True:
+     four_gene_state='4G no connection'
+     return four_gene_state
+  ser=serial.Serial('/dev/ttyUSB0',115200,timeout=1)
+  sum=0
+  while True:
+    sum=sum+1
+    ser.write('AT+CIMI\r')
+    tmp=ser.readlines()
+    ser.write('at+cfun=1\r')
+    tmp=ser.readlines()
+    if sum==2:
+       ser.write('at+cfun=1\r') 
+       tmp=ser.readlines()
+       ser.write('AT+CIMI\r')
+       tmp=ser.readlines()
+       if tmp[3]!='OK\r\n':
+          four_gene_state='4G no SIM card'
+          return four_gene_state
+       ser.write("AT+CLCK=\"SC\",2\r")
+       tmp=ser.readlines()
+       if tmp[3]!='OK\r\n':
+          ser.write("AT+CSQ\r")
+          tmp=ser.readlines()  
+          buf=tmp[1].split(':')
+          buf1=buf[1]
+          buf2=buf1.split(',')
+          four_gene_state='4G SIM card locked'
+          return four_gene_state
+       else:
+          ser.write("AT+CSQ\r")
+          tmp=ser.readlines()
+          buf=tmp[1].split(':')
+          buf1=buf[1]
+          buf2=buf1.split(',')
+          four_gene_state='4G normal'
+          return four_gene_state
+
+def get_gps_state():
+  ser = serial.Serial('/dev/ttyAMA0',9600,timeout=1)
+  ser.open()
+  sum=0
+  while True:
+    tmp=ser.readline()
+    if tmp=='':
+       gps_state='GPS no connection'
+       ser.close()
+       return gps_state
+    if tmp.find('GPGGA')==1:
+       sum=sum+1
+       if sum==2:
+          buf = tmp.split(',')
+          if buf[6]=='0':
+             gps_state='GPS no location'
+             ser.close()
+             return gps_state
+          else:
+             gps_state='GPS success locating'
+             ser.close()
+             return gps_state
